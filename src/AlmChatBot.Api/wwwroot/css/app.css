@@ -1,0 +1,331 @@
+:root {
+  --ink: #1c1916;
+  --muted: #6b6258;
+  --paper: #f4efe6;
+  --card: #fffdf8;
+  --line: #ddd4c6;
+  --accent: #1f4d45;
+  --accent-hover: #163832;
+  --danger: #8a2f2f;
+  --mono: "Cascadia Mono", "Consolas", ui-monospace, monospace;
+  --sans: "Segoe UI", "Trebuchet MS", sans-serif;
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  min-height: 100vh;
+  background: var(--paper);
+  color: var(--ink);
+  font-family: var(--sans);
+  font-size: 16px;
+  line-height: 1.45;
+}
+
+.top {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-end;
+  gap: 16px;
+  padding: 28px 28px 12px;
+  border-bottom: 1px solid var(--line);
+}
+
+.kicker {
+  margin: 0 0 4px;
+  font-size: 12px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+h1 {
+  margin: 0;
+  font-size: 28px;
+  font-weight: 650;
+}
+
+.status {
+  margin: 0;
+  font-size: 13px;
+  color: var(--muted);
+}
+
+main {
+  max-width: 1180px;
+  margin: 0 auto;
+  padding: 24px 28px 64px;
+}
+
+.ask label {
+  display: block;
+  font-weight: 600;
+  margin-bottom: 8px;
+}
+
+textarea {
+  width: 100%;
+  resize: vertical;
+  padding: 12px 14px;
+  border: 1px solid var(--line);
+  background: var(--card);
+  color: var(--ink);
+  font: inherit;
+  border-radius: 6px;
+}
+
+textarea:focus {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+
+.chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 12px 0;
+}
+
+.chips button {
+  border: 1px solid var(--line);
+  background: transparent;
+  color: var(--ink);
+  padding: 6px 10px;
+  border-radius: 999px;
+  cursor: pointer;
+  font: inherit;
+  font-size: 13px;
+}
+
+.chips button:hover { background: #efe8db; }
+
+.actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+button[type="submit"] {
+  background: var(--accent);
+  color: #f7f3ea;
+  border: 0;
+  padding: 10px 18px;
+  border-radius: 6px;
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+button[type="submit"]:hover { background: var(--accent-hover); }
+button[type="submit"]:disabled { opacity: 0.55; cursor: not-allowed; }
+
+.actions button.secondary {
+  background: transparent;
+  color: var(--accent);
+  border: 1px solid var(--accent);
+  padding: 10px 18px;
+  border-radius: 6px;
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.actions button.secondary:hover { background: #eef6f3; }
+.actions button.secondary:disabled { opacity: 0.55; cursor: not-allowed; }
+
+.busy { color: var(--muted); font-size: 14px; }
+
+.error {
+  margin-top: 16px;
+  padding: 12px 14px;
+  border: 1px solid #e3c4c4;
+  background: #f8ecec;
+  color: var(--danger);
+}
+
+.panel {
+  margin-top: 20px;
+  padding: 16px 18px;
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+}
+
+.panel h2 {
+  margin: 0 0 10px;
+  font-size: 13px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--muted);
+  font-weight: 650;
+}
+
+.panel h3 {
+  margin: 14px 0 8px;
+  font-size: 14px;
+  font-weight: 650;
+}
+
+ul.risks { color: var(--danger); }
+
+.insight { margin: 0; white-space: pre-wrap; }
+.meta { margin: 10px 0 0; color: var(--muted); font-size: 13px; }
+.note { color: var(--muted); font-size: 14px; }
+
+.panel-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.panel-head h2 { margin: 0; }
+
+.chart-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.chart-actions .secondary,
+.chart-actions .ghost {
+  background: transparent;
+  color: var(--accent);
+  border: 1px solid var(--accent);
+  padding: 6px 12px;
+  border-radius: 6px;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.chart-actions .ghost {
+  color: var(--ink);
+  border-color: var(--line);
+}
+
+.chart-actions .ghost.active {
+  border-color: var(--accent);
+  color: var(--accent);
+  background: #eef6f3;
+}
+
+.chart-actions button:disabled { opacity: 0.55; cursor: not-allowed; }
+
+.data-split {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 16px;
+  margin-top: 8px;
+}
+
+.data-split.with-chart {
+  grid-template-columns: minmax(0, 1fr) minmax(280px, 1fr);
+}
+
+@media (max-width: 900px) {
+  .data-split.with-chart { grid-template-columns: 1fr; }
+}
+
+.table-wrap { overflow: auto; max-height: 420px; }
+
+#chart-panel {
+  margin: 0;
+  min-height: 280px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 8px 8px 4px;
+  background: #fffdf8;
+}
+
+#chart-svg {
+  display: block;
+  width: 100%;
+  height: 280px;
+}
+
+#chart-caption {
+  margin: 4px 8px 8px;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+table {
+  border-collapse: collapse;
+  width: 100%;
+  font-size: 13px;
+}
+
+th, td {
+  border-bottom: 1px solid var(--line);
+  padding: 8px 10px;
+  text-align: left;
+  white-space: nowrap;
+}
+
+th { color: var(--muted); font-weight: 650; }
+td.num { text-align: right; font-variant-numeric: tabular-nums; }
+
+pre {
+  margin: 12px 0 0;
+  padding: 12px;
+  background: #1c1916;
+  color: #f4efe6;
+  overflow: auto;
+  font-family: var(--mono);
+  font-size: 13px;
+  border-radius: 6px;
+}
+
+details summary {
+  cursor: pointer;
+  font-weight: 650;
+}
+
+ul { margin: 8px 0 0; padding-left: 18px; color: var(--muted); }
+
+.confirm {
+  margin-top: 20px;
+  padding: 16px 18px;
+  background: #eef6f3;
+  border: 1px solid #c5d9d3;
+  border-radius: 8px;
+}
+
+.confirm-kicker {
+  margin: 0 0 8px;
+  font-size: 13px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--accent);
+  font-weight: 650;
+}
+
+.confirm-summary { margin: 0 0 8px; color: var(--muted); font-size: 14px; }
+.confirm-question { margin: 0; font-weight: 600; }
+
+.confirm-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 14px;
+}
+
+.confirm-actions button {
+  border: 0;
+  padding: 8px 14px;
+  border-radius: 6px;
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+  background: var(--accent);
+  color: #f7f3ea;
+}
+
+.confirm-actions button.ghost {
+  background: transparent;
+  color: var(--ink);
+  border: 1px solid var(--line);
+}

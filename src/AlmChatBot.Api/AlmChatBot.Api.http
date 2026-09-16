@@ -1,0 +1,10 @@
+@AlmChatBot.Api_HostAddress = http://localhost:5074
+
+POST {{AlmChatBot.Api_HostAddress}}/api/alm/ask
+Content-Type: application/json
+
+{
+  "question": "Türev finansal araçların son rapor tarihindeki toplam bakiyesi nedir?"
+}
+
+###

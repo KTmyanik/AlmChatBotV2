@@ -1,0 +1,10 @@
+# ALM Text-to-SQL (.NET 8 Web API)
+
+- Yalnızca [IFRSStaging].[ALM] şeması: InternalReports, InternalDurationReports, InternalReportMap, CoreDepositRates.
+- Join: InternalReports.ALMCOACODE = InternalReportMap.AlmCoaCode ve InternalDurationReports.ALMCOACODE = InternalReportMap.AlmCoaCode. RowId / ROW_ID join’de kullanılmaz.
+- Başlık soruları (Header1–Header7) yaprak ALMCOACODE listesine açılır; boş kodlu başlık satırı SUM’a katılmaz.
+- Filtre/kod değerleri tablodaki DISTINCT kayıtlardan alınır. Sözlükteki örnek değerler yok sayılır.
+- Üretilen SQL ScriptDom ile tek SELECT olarak doğrulanır; DDL/DML, SELECT INTO, EXEC, OPENROWSET, çapraz şema yasaktır.
+- TOP yoksa AST üzerinden TOP (200) eklenir.
+- Duration metrikleri bakiye ağırlıklı: SUM(bakiye * metrik) / SUM(bakiye).
+- ApiKey appsettings’e gerçek değer olarak yazılmaz; User Secrets / ortam değişkeni kullanılır.

@@ -1,0 +1,93 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>ALM Soru</title>
+  <link rel="stylesheet" href="/css/app.css" />
+</head>
+<body>
+  <header class="top">
+    <div>
+      <p class="kicker">IFRSStaging · ALM</p>
+      <h1>Soru</h1>
+    </div>
+    <p id="model-status" class="status">Model yükleniyor…</p>
+  </header>
+
+  <main>
+    <form id="ask-form" class="ask">
+      <label for="question">Ne öğrenmek istiyorsunuz?</label>
+      <textarea id="question" name="question" rows="3" required placeholder="Örn. Türev finansal araçların son rapor tarihindeki toplam bakiyesi nedir?"></textarea>
+      <div class="chips" id="chips"></div>
+      <div class="actions">
+        <button type="submit" id="ask-btn">Sor</button>
+        <button type="button" id="analyze-btn" class="secondary" disabled>Analiz</button>
+        <button type="button" id="bulletin-btn" class="secondary">Bülten</button>
+        <span id="busy" class="busy" hidden>Sorgu çalıştırılıyor…</span>
+      </div>
+    </form>
+
+    <aside id="confirm" class="confirm" hidden>
+      <p class="confirm-kicker">Bunu mu demek istediniz?</p>
+      <p id="confirm-summary" class="confirm-summary"></p>
+      <p id="confirm-question" class="confirm-question"></p>
+      <ul id="confirm-corrections"></ul>
+      <div class="confirm-actions">
+        <button type="button" id="confirm-yes">Evet, bunu sor</button>
+        <button type="button" id="confirm-no" class="ghost">Hayır, düzelteceğim</button>
+      </div>
+    </aside>
+
+    <p id="error" class="error" hidden></p>
+
+    <section id="bulletin" hidden>
+      <article class="panel">
+        <h2>Güncel bülten</h2>
+        <p id="bulletin-meta" class="meta"></p>
+        <h3>Durum</h3>
+        <ul id="bulletin-situation"></ul>
+        <h3>Riskler</h3>
+        <ul id="bulletin-risks" class="risks"></ul>
+      </article>
+    </section>
+
+    <section id="result" hidden>
+      <article class="panel">
+        <div class="panel-head">
+          <h2>Veri</h2>
+          <div class="chart-actions">
+            <button type="button" id="chart-btn" class="secondary" disabled>Grafik</button>
+            <button type="button" id="chart-bar" class="ghost" hidden>Çubuk</button>
+            <button type="button" id="chart-line" class="ghost" hidden>Çizgi</button>
+          </div>
+        </div>
+        <p id="meta" class="meta"></p>
+        <div class="data-split">
+          <div class="table-wrap">
+            <table id="data-table"></table>
+          </div>
+          <figure id="chart-panel" hidden>
+            <svg id="chart-svg" role="img" aria-label="Sonuç grafiği"></svg>
+            <figcaption id="chart-caption"></figcaption>
+          </figure>
+        </div>
+      </article>
+
+      <details class="panel" open>
+        <summary>Üretilen SQL</summary>
+        <pre id="sql"></pre>
+        <p id="explanation" class="note"></p>
+        <ul id="assumptions"></ul>
+      </details>
+
+      <article class="panel">
+        <h2>Analiz</h2>
+        <p id="insight" class="insight">Tablo geldikten sonra Analiz’e basın.</p>
+      </article>
+    </section>
+  </main>
+
+  <script src="/js/app.js?v=2"></script>
+</body>
+</html>
