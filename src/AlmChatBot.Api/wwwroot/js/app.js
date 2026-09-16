@@ -396,8 +396,10 @@ const TENOR_LABELS = {
 };
 const CHART_COLORS = ["#1f4d45", "#8a5a2f", "#3d6e8a", "#8a2f2f", "#5a6b3a", "#6b4d7a", "#2f6b5a", "#a67c4e"];
 const MEASURE_HINTS = [
-  "Tutar", "OutstandingBalance", "KisaVade", "ModifiedDuration", "MODIFIED_DURATION",
-  "MACAULAY_DURATION", "CONVEXITY", "YIELD_TO_MATURITY", "PV01_REPORTING_CCY", "PV01_DEAL_CCY", "Pv01"
+  "Tutar", "Toplam_Bakiye", "OutstandingBalance", "KisaVade",
+  "Agirlikli_Mod_Duration", "ModifiedDuration", "MODIFIED_DURATION",
+  "Toplam_PV01_TRY", "Pv01", "PV01_REPORTING_CCY", "PV01_DEAL_CCY",
+  "MACAULAY_DURATION", "CONVEXITY", "YIELD_TO_MATURITY"
 ];
 
 function prepareChart(rows) {

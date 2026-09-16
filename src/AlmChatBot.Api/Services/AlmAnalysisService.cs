@@ -224,8 +224,11 @@ public sealed class AlmAnalysisService(
 
     private static string DurationNote(QuestionInterpretation query, IReadOnlyList<Dictionary<string, object?>> rows)
     {
-        var value = FirstDecimal(rows, query.Metric ?? "MODIFIED_DURATION");
-        var bal = FirstDecimal(rows, "OutstandingBalance");
+        var value = FirstDecimal(rows, "Agirlikli_Mod_Duration")
+                    ?? FirstDecimal(rows, "Agirlikli_Mac_Duration")
+                    ?? FirstDecimal(rows, "Agirlikli_YTM")
+                    ?? FirstDecimal(rows, query.Metric ?? "MODIFIED_DURATION");
+        var bal = FirstDecimal(rows, "Toplam_Bakiye") ?? FirstDecimal(rows, "OutstandingBalance");
         if (value is null)
         {
             return "Duration sonucu okunamadı.";

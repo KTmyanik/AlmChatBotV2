@@ -95,7 +95,8 @@ Tablo her kesitte tam hiyerarşiyi taşır. Soru belirtmezse:
 
 - `REPORTING_DATE = (SELECT MAX(REPORTING_DATE) FROM [ALM].[InternalReports])`
 - `BALANCE_TYPE = N'TOTAL'`
-- `APPROACH_CODE`, `CCY_CODE`, `POOL_TYPE` sorudan doldurulur; yoksa varsayma, Assumptions’a yaz veya soruyu daralt.
+- `APPROACH_CODE = N'Liquidity'` (soruda Kar payı / Rate yoksa)
+- `CCY_CODE`, `POOL_TYPE` sorudan doldurulur; yoksa varsayma, Assumptions’a yaz veya soruyu daralt.
 - Döviz belirtilmeden `SUM` across CCY_CODE yapma.
 
 ## InternalDurationReports — kolonlar
@@ -117,14 +118,40 @@ Tablo her kesitte tam hiyerarşiyi taşır. Soru belirtmezse:
 | PV01_REPORTING_CCY | Raporlama cinsi PV01 |
 | REMAINING_LIFE | Kalan ömür |
 
-Ağırlıklı metrik (zorunlu; `AVG` kullanma):
+Yaprak: `dr.ALMCOACODE IS NOT NULL`. Tarih yoksa `MAX(REPORTING_DATE)` (tarih taraması soruları hariç).
+
+### Portföy ve üst kırılım (Header1..7) agregasyon kuralları
+
+Kullanıcı belirli bir hiyerarşi kırılımında (Header1, Header2, … Header7) veya portföy genelinde risk metriklerini istediğinde aşağıdaki agregasyon kuralları zorunludur. Alias: `InternalDurationReports` → `dr`. `AVG` kullanılmaz. Boş `ALMCOACODE` satırı toplanmaz.
+
+1. **Bakiye (ağırlık)**
 
 ```sql
-SUM(dr.OUTSTANDING_BALANCE * dr.MODIFIED_DURATION)
-  / NULLIF(SUM(dr.OUTSTANDING_BALANCE), 0)
+SUM(dr.OUTSTANDING_BALANCE) AS Toplam_Bakiye
 ```
 
-Yaprak: `dr.ALMCOACODE IS NOT NULL`. Tarih yoksa `MAX(REPORTING_DATE)`.
+2. **Doğrudan toplanacak parasal risk kolonları (SUM)**
+
+`PV01` kolonlarının ağırlıklı ortalaması alınmaz; doğrudan `SUM` edilir.
+
+```sql
+SUM(dr.PV01_REPORTING_CCY) AS Toplam_PV01_TRY
+```
+
+3. **Bakiye ağırlıklı ortalaması alınacak kolonlar**
+
+Sıfıra bölünmeyi engellemek için her zaman `NULLIF(SUM(dr.OUTSTANDING_BALANCE), 0)` kullanılır:
+
+```sql
+SUM(dr.MODIFIED_DURATION * dr.OUTSTANDING_BALANCE) / NULLIF(SUM(dr.OUTSTANDING_BALANCE), 0) AS Agirlikli_Mod_Duration
+SUM(dr.MACAULAY_DURATION * dr.OUTSTANDING_BALANCE) / NULLIF(SUM(dr.OUTSTANDING_BALANCE), 0) AS Agirlikli_Mac_Duration
+SUM(dr.YIELD_TO_MATURITY * dr.OUTSTANDING_BALANCE) / NULLIF(SUM(dr.OUTSTANDING_BALANCE), 0) AS Agirlikli_YTM
+SUM(dr.CONVEXITY * dr.OUTSTANDING_BALANCE) / NULLIF(SUM(dr.OUTSTANDING_BALANCE), 0) AS Agirlikli_Convexity
+SUM(dr.REMAINING_LIFE * dr.OUTSTANDING_BALANCE) / NULLIF(SUM(dr.OUTSTANDING_BALANCE), 0) AS Agirlikli_Kalan_Omur
+SUM(dr.COMPARABLE_YIELD * dr.OUTSTANDING_BALANCE) / NULLIF(SUM(dr.OUTSTANDING_BALANCE), 0) AS Agirlikli_Gosterge_Getiri
+```
+
+`GROUP BY` kırılımı sorudaki Header seviyesine (ve tarihe) göre kurulur.
 
 ## InternalReportMap — kolonlar
 

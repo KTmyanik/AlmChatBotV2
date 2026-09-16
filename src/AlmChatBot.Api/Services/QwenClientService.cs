@@ -372,10 +372,10 @@ public sealed class QwenClientService(
                 BALANCE_TYPE: TOTAL | PRINCIPALRECEIVED | PRINCIPALPAID | INTERESTRECEIVED | INTERESTPAID
                 CCY_CODE: TRY | USD | EUR | XAU | XAG | DGR — farklı CCY SUM etme
                 Tarih yoksa MAX(REPORTING_DATE). 'en yüksek/en düşük olduğu tarih', 'hangi tarih', 'tarihler arası' ise MAX kullanma: tüm REPORTING_DATE GROUP BY, ORDER BY Tutar DESC/ASC. Belirtilmezse BALANCE_TYPE=N'TOTAL'.
-                APPROACH/CCY/POOL yoksa uydurma; Assumptions'a yaz.
+                APPROACH belirtilmezse Liquidity. CCY/POOL yoksa uydurma; Assumptions'a yaz.
 
                 Vade dilimleri: DAY_1..DAY_7, DAY_8_15, DAY_16_30, MONTH_*, YEAR_*
-                Duration: SUM(dr.OUTSTANDING_BALANCE * metrik) / NULLIF(SUM(dr.OUTSTANDING_BALANCE),0). AVG yok.
+                Duration: Header1–7 / portföyde PV01 = SUM(dr.PV01_REPORTING_CCY) AS Toplam_PV01_TRY (ağırlıklı ortalama yok). Bakiye = SUM(OUTSTANDING_BALANCE) AS Toplam_Bakiye. MD/Macaulay/YTM/convexity/kalan ömür/gösterge getiri = SUM(metrik * bakiye) / NULLIF(SUM(bakiye),0). AVG yok.
                 Türev araçlar Header2 N'TÜREV FİNANSAL ARAÇLAR' (BD/TFA/IRS,CCS,VI,FXSWAP).
                 TFV: TP/A/TFV, YP/A/TFV. TFY: TP/P/TFY, YP/P/TFY.
                 SELECT * yok. Unicode N'...'. TOP sistem ekler.
@@ -393,9 +393,9 @@ public sealed class QwenClientService(
             - Join yalnızca ALMCOACODE = AlmCoaCode. RowId kullanma.
             - Başlık sorularında map Header1-Header7 ile yaprak kodlara in; boş ALMCOACODE satırını toplama.
             - Kod değerlerini aşağıdaki sözlükteki DISTINCT listelerden al; uydurma kod yazma.
-            - Likidite=Liquidity, Kar Payı=Rate, Özkaynak=OZKAYNAK, Toplam=TOTAL.
+            - Likidite=Liquidity (varsayılan), Kar Payı=Rate, Özkaynak=OZKAYNAK, Toplam=TOTAL.
             - Dövizleri karma SUM etme. Tarih yoksa MAX(REPORTING_DATE). En yüksek/en düşük olduğu tarih veya tarihler arası karşılaştırma ise MAX filtreleme; GROUP BY REPORTING_DATE.
-            - Duration için AVG değil, bakiye ağırlıklı ortalama.
+            - Duration Header1–7 / portföy: PV01 SUM (ağırlıklı ortalama yok); MD/YTM/convexity/kalan ömür/gösterge getiri bakiye ağırlıklı (NULLIF). AVG yok.
             - SELECT * yazma. Unicode için N'...'.
 
             VERİ SÖZLÜĞÜ:

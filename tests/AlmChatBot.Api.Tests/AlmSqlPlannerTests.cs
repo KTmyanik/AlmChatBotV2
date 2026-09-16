@@ -19,6 +19,18 @@ public sealed class AlmSqlPlannerTests
         Assert.Contains("YEAR_20_PLUS", plan.Sql);
         Assert.DoesNotContain("RowId", plan.Sql, StringComparison.OrdinalIgnoreCase);
         Assert.Contains("COLLATE Latin1_General_CI_AI", plan.Sql);
+        Assert.Contains("N'Liquidity'", plan.Sql);
+    }
+
+    [Fact]
+    public void Defaults_approach_to_liquidity()
+    {
+        var plan = _sut.TryPlan("krediler tutarının en yüksek olduğu tarih ne");
+
+        Assert.NotNull(plan);
+        Assert.Contains("N'Liquidity'", plan.Sql);
+        Assert.Contains("APPROACH_CODE belirtilmedi; N'Liquidity' alındı.", plan.Assumptions);
+        Assert.DoesNotContain("ir.APPROACH_CODE,", plan.Sql);
     }
 
     [Fact]
@@ -43,8 +55,34 @@ public sealed class AlmSqlPlannerTests
         Assert.NotNull(plan);
         Assert.Contains("InternalDurationReports", plan.Sql, StringComparison.OrdinalIgnoreCase);
         Assert.Contains("MODIFIED_DURATION", plan.Sql);
-        Assert.Contains("OUTSTANDING_BALANCE * dr.MODIFIED_DURATION", plan.Sql);
+        Assert.Contains("dr.MODIFIED_DURATION * dr.OUTSTANDING_BALANCE", plan.Sql);
+        Assert.Contains("NULLIF(SUM(dr.OUTSTANDING_BALANCE), 0)", plan.Sql);
+        Assert.Contains("Toplam_Bakiye", plan.Sql);
+        Assert.Contains("Agirlikli_Mod_Duration", plan.Sql);
         Assert.Contains("N'KREDİLER'", plan.Sql);
+    }
+
+    [Fact]
+    public void Plans_pv01_as_sum_not_weighted_average()
+    {
+        var plan = _sut.TryPlan("Son rapor tarihinde kredilerin pv01'i nedir?");
+
+        Assert.NotNull(plan);
+        Assert.Contains("SUM(dr.PV01_REPORTING_CCY) AS Toplam_PV01_TRY", plan.Sql);
+        Assert.Contains("Toplam_Bakiye", plan.Sql);
+        Assert.DoesNotContain("PV01_REPORTING_CCY * dr.OUTSTANDING_BALANCE", plan.Sql);
+    }
+
+    [Fact]
+    public void Plans_header_risk_metrics_bundle()
+    {
+        var plan = _sut.TryPlan("Kredilerin risk metrikleri nedir?");
+
+        Assert.NotNull(plan);
+        Assert.Contains("Toplam_PV01_TRY", plan.Sql);
+        Assert.Contains("Agirlikli_YTM", plan.Sql);
+        Assert.Contains("Agirlikli_Gosterge_Getiri", plan.Sql);
+        Assert.Contains("Agirlikli_Kalan_Omur", plan.Sql);
     }
 
     [Fact]

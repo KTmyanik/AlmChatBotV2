@@ -197,10 +197,10 @@ public sealed class AlmSqlPlanner : IAlmSqlPlanner
         var compactDate = MatchDate(folded);
         var dateScan = compactDate is null ? MatchDateScan(folded) : DateScanMode.Snapshot;
         var tenorDist = metric is null && bucket is null && AsksTenorDistribution(folded);
-        if (tenorDist && approach is null)
+        if (approach is null)
         {
             approach = "Liquidity";
-            assumptions.Add("Vade dilimi dağılımı için APPROACH_CODE = Liquidity alındı.");
+            assumptions.Add("APPROACH_CODE belirtilmedi; N'Liquidity' alındı.");
         }
 
         var dateSql = BuildDatePredicate(folded, metric is not null, dateScan, assumptions);
@@ -212,25 +212,22 @@ public sealed class AlmSqlPlanner : IAlmSqlPlanner
         LlmSqlResponse sql;
         if (metric is not null)
         {
-            if (approach is not null || ccy is not null || pool is not null)
+            if (ccy is not null || pool is not null)
             {
-                assumptions.Add("InternalDurationReports içinde APPROACH/CCY/POOL kolonu yok; bu filtreler uygulanamadı.");
+                assumptions.Add("InternalDurationReports içinde CCY/POOL kolonu yok; bu filtreler uygulanamadı.");
             }
 
             sql = new LlmSqlResponse
             {
                 Sql = BuildDurationSql(item, metric, dateSql, dateScan),
-                Explanation = "SQL kural motoru ile üretildi (LLM yok). Duration bakiye ağırlıklı ortalama.",
+                Explanation = metric == "ALL"
+                    ? "SQL kural motoru ile üretildi. Header/portföy duration: PV01 SUM, diğer metrikler bakiye ağırlıklı."
+                    : "SQL kural motoru ile üretildi (LLM yok). Duration bakiye ağırlıklı ortalama; PV01 SUM.",
                 Assumptions = assumptions
             };
         }
         else
         {
-            if (approach is null)
-            {
-                assumptions.Add("APPROACH_CODE belirtilmedi; satırlar yaklaşıma göre kırıldı (karma SUM yok).");
-            }
-
             if (ccy is null)
             {
                 assumptions.Add("CCY_CODE belirtilmedi; satırlar dövize göre kırıldı (karma SUM yok).");
@@ -388,12 +385,12 @@ public sealed class AlmSqlPlanner : IAlmSqlPlanner
         where.Add("LTRIM(RTRIM(dr.ALMCOACODE)) <> N''");
         where.Add($"map.{item.HeaderColumn} COLLATE Latin1_General_CI_AI = N'{Escape(item.HeaderValue)}' COLLATE Latin1_General_CI_AI");
 
+        var measureAlias = metricColumn == "ALL" ? "Toplam_Bakiye" : DurationAlias(metricColumn);
         var sql = $"""
             SELECT
               map.{item.HeaderColumn} AS Kalem,
               dr.REPORTING_DATE,
-              SUM(dr.OUTSTANDING_BALANCE * dr.{metricColumn}) / NULLIF(SUM(dr.OUTSTANDING_BALANCE), 0) AS {metricColumn},
-              SUM(dr.OUTSTANDING_BALANCE) AS OutstandingBalance
+              {DurationSelectList(metricColumn)}
             FROM [ALM].[InternalDurationReports] AS dr
             INNER JOIN [ALM].[InternalReportMap] AS map
               ON dr.ALMCOACODE = map.AlmCoaCode
@@ -403,13 +400,57 @@ public sealed class AlmSqlPlanner : IAlmSqlPlanner
 
         var orderBy = dateScan switch
         {
-            DateScanMode.Highest => $"{metricColumn} DESC, dr.REPORTING_DATE DESC",
-            DateScanMode.Lowest => $"{metricColumn} ASC, dr.REPORTING_DATE DESC",
+            DateScanMode.Highest => $"{measureAlias} DESC, dr.REPORTING_DATE DESC",
+            DateScanMode.Lowest => $"{measureAlias} ASC, dr.REPORTING_DATE DESC",
             DateScanMode.Series => "dr.REPORTING_DATE",
             _ => null
         };
         return orderBy is null ? sql : sql + $"{Environment.NewLine}            ORDER BY {orderBy}";
     }
+
+    private static readonly string[] AllDurationMetrics =
+    [
+        "PV01_REPORTING_CCY",
+        "MODIFIED_DURATION",
+        "MACAULAY_DURATION",
+        "YIELD_TO_MATURITY",
+        "CONVEXITY",
+        "REMAINING_LIFE",
+        "COMPARABLE_YIELD"
+    ];
+
+    private static string DurationSelectList(string metricColumn)
+    {
+        var parts = new List<string> { "SUM(dr.OUTSTANDING_BALANCE) AS Toplam_Bakiye" };
+        if (metricColumn == "ALL")
+        {
+            parts.AddRange(AllDurationMetrics.Select(DurationExpr));
+        }
+        else
+        {
+            parts.Add(DurationExpr(metricColumn));
+        }
+
+        return string.Join($",{Environment.NewLine}              ", parts);
+    }
+
+    private static string DurationExpr(string column) =>
+        column.StartsWith("PV01_", StringComparison.OrdinalIgnoreCase)
+            ? $"SUM(dr.{column}) AS {DurationAlias(column)}"
+            : $"SUM(dr.{column} * dr.OUTSTANDING_BALANCE) / NULLIF(SUM(dr.OUTSTANDING_BALANCE), 0) AS {DurationAlias(column)}";
+
+    private static string DurationAlias(string column) => column switch
+    {
+        "PV01_REPORTING_CCY" => "Toplam_PV01_TRY",
+        "PV01_DEAL_CCY" => "Toplam_PV01_DealCcy",
+        "MODIFIED_DURATION" => "Agirlikli_Mod_Duration",
+        "MACAULAY_DURATION" => "Agirlikli_Mac_Duration",
+        "YIELD_TO_MATURITY" => "Agirlikli_YTM",
+        "CONVEXITY" => "Agirlikli_Convexity",
+        "REMAINING_LIFE" => "Agirlikli_Kalan_Omur",
+        "COMPARABLE_YIELD" => "Agirlikli_Gosterge_Getiri",
+        _ => column
+    };
 
     private static void AddDim(List<string> select, List<string> group, string? filter, string column)
     {
@@ -543,19 +584,32 @@ public sealed class AlmSqlPlanner : IAlmSqlPlanner
             return "CONVEXITY";
         }
 
-        if (folded.Contains("ytm", StringComparison.Ordinal) || folded.Contains("yield", StringComparison.Ordinal))
+        if (ContainsAny(folded, "gösterge getiri", "gosterge getiri", "comparable yield", "karşılaştırmalı getiri", "karsilastirmali getiri"))
+        {
+            return "COMPARABLE_YIELD";
+        }
+
+        if (folded.Contains("ytm", StringComparison.Ordinal)
+            || (folded.Contains("yield", StringComparison.Ordinal) && !folded.Contains("comparable", StringComparison.Ordinal)))
         {
             return "YIELD_TO_MATURITY";
         }
 
         if (folded.Contains("pv01", StringComparison.Ordinal))
         {
-            return folded.Contains("rapor", StringComparison.Ordinal) ? "PV01_REPORTING_CCY" : "PV01_DEAL_CCY";
+            return ContainsAny(folded, "deal", "işlem cinsi", "islem cinsi")
+                ? "PV01_DEAL_CCY"
+                : "PV01_REPORTING_CCY";
         }
 
         if (folded.Contains("kalan ömür", StringComparison.Ordinal) || folded.Contains("remaining life", StringComparison.Ordinal))
         {
             return "REMAINING_LIFE";
+        }
+
+        if (ContainsAny(folded, "risk metrik", "tüm duration", "tum duration", "duration rapor"))
+        {
+            return "ALL";
         }
 
         return null;
