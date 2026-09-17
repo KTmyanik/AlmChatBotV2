@@ -7,6 +7,41 @@ public sealed class AlmSqlPlannerTests
     private readonly AlmSqlPlanner _sut = new();
 
     [Fact]
+    public void Plans_trading_book_as_header3_alim_satim()
+    {
+        var plan = _sut.TryPlan("Alım-satım portföyünün son rapor bakiyesi nedir?");
+
+        Assert.NotNull(plan);
+        Assert.Contains("Header3", plan.Sql);
+        Assert.Contains("N'Alim-Satim'", plan.Sql);
+        Assert.Contains("[ALM].[InternalReports]", plan.Sql);
+        Assert.DoesNotContain("InternalDurationReports", plan.Sql, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("PV01", plan.Sql, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public void Plans_npl_as_nonperforming_loans()
+    {
+        var plan = _sut.TryPlan("NPL kaç");
+
+        Assert.NotNull(plan);
+        Assert.Contains("N'TAKİPTEKİ ALACAKLAR'", plan.Sql);
+        Assert.Contains("[ALM].[InternalReports]", plan.Sql);
+    }
+
+    [Fact]
+    public void Plans_htm_tlref_securities()
+    {
+        var plan = _sut.TryPlan("vadeye kadar elde tutulacak TLREF");
+
+        Assert.NotNull(plan);
+        Assert.Contains("N'Vadeye Kadar Elde Tutulacak'", plan.Sql);
+        Assert.Contains("Header3", plan.Sql);
+        Assert.Contains("LIKE N'%TLREF%'", plan.Sql);
+        Assert.Contains("[ALM].[InternalReports]", plan.Sql);
+    }
+
+    [Fact]
     public void Plans_derivative_total_balance()
     {
         var plan = _sut.TryPlan("Türev finansal araçların son rapor tarihindeki toplam bakiyesi nedir?");
@@ -160,5 +195,81 @@ public sealed class AlmSqlPlannerTests
         Assert.False(second.NeedsConfirmation);
         Assert.NotNull(second.Sql);
         Assert.Contains("BİLANÇO DIŞI İŞLEMLER", second.Sql!.Sql);
+    }
+
+    [Fact]
+    public void General_item_returns_headline_total_and_follow_ups()
+    {
+        var interpreted = _sut.Interpret("Kredilerin son rapor bakiyesi nedir?");
+
+        Assert.NotNull(interpreted.Sql);
+        Assert.DoesNotContain("ir.CCY_CODE", interpreted.Sql!.Sql);
+        Assert.DoesNotContain("ir.POOL_TYPE", interpreted.Sql.Sql);
+        Assert.Contains("Ana kırılımın toplamı", interpreted.Sql.Explanation);
+        Assert.Contains(interpreted.FollowUps, f => f.Label == "Döviz koduna göre");
+        Assert.Contains(interpreted.FollowUps, f => f.Label == "Havuz tipine göre");
+        Assert.Contains(interpreted.FollowUps, f => f.Label.Contains("TP", StringComparison.Ordinal));
+        Assert.Contains(interpreted.FollowUps, f => f.Label == "Alt kalemlere göre");
+
+        var ccyPlan = _sut.TryPlan(interpreted.FollowUps.First(f => f.Label == "Döviz koduna göre").Question);
+        Assert.NotNull(ccyPlan);
+        Assert.Contains("ir.CCY_CODE", ccyPlan!.Sql);
+        Assert.Contains("N'KREDİLER'", ccyPlan.Sql);
+    }
+
+    [Fact]
+    public void Splits_loans_by_currency_when_requested()
+    {
+        var plan = _sut.TryPlan("Krediler döviz koduna göre toplam bakiye nedir?");
+
+        Assert.NotNull(plan);
+        Assert.Contains("ir.CCY_CODE", plan.Sql);
+        Assert.DoesNotContain("ir.POOL_TYPE", plan.Sql);
+        Assert.Contains("dövize göre kırıldı", string.Join(' ', plan.Assumptions));
+    }
+
+    [Fact]
+    public void Splits_deposits_by_pool_when_requested()
+    {
+        var plan = _sut.TryPlan("Mevduat havuz tipine göre toplam bakiye nedir?");
+
+        Assert.NotNull(plan);
+        Assert.Contains("ir.POOL_TYPE", plan.Sql);
+        Assert.Contains("N'MEVDUAT'", plan.Sql);
+    }
+
+    [Fact]
+    public void Splits_deposits_by_tp_yp_prefix()
+    {
+        var plan = _sut.TryPlan("Mevduat TP YP ayrımına göre toplam bakiye nedir?");
+
+        Assert.NotNull(plan);
+        Assert.Contains("LIKE N'TP/%'", plan.Sql);
+        Assert.Contains("AS TpYp", plan.Sql);
+        Assert.Contains("N'MEVDUAT'", plan.Sql);
+    }
+
+    [Fact]
+    public void Plans_assets_as_header1_total()
+    {
+        var interpreted = _sut.Interpret("Varlık bakiyesi nedir?");
+
+        Assert.NotNull(interpreted.Sql);
+        Assert.Contains("Header1", interpreted.Sql!.Sql);
+        Assert.Contains("N'VARLIKLAR'", interpreted.Sql.Sql);
+        Assert.DoesNotContain("ir.CCY_CODE", interpreted.Sql.Sql);
+        Assert.Contains(interpreted.FollowUps, f => f.Label == "KREDİLER");
+        Assert.Contains(interpreted.FollowUps, f => f.Label == "NAKİT VE NAKİT BENZERLERİ");
+    }
+
+    [Fact]
+    public void Splits_assets_into_header2_children()
+    {
+        var plan = _sut.TryPlan("Varlık alt kalemlere göre toplam bakiye nedir?");
+
+        Assert.NotNull(plan);
+        Assert.Contains("N'VARLIKLAR'", plan.Sql);
+        Assert.Contains("Header2 AS AltKalem", plan.Sql);
+        Assert.Contains("map.Header2 IS NOT NULL", plan.Sql);
     }
 }

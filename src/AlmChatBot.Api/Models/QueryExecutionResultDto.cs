@@ -27,4 +27,13 @@ public sealed class QueryExecutionResultDto
     public string? InterpretationSummary { get; set; }
 
     public List<string> Corrections { get; set; } = [];
+
+    public List<FollowUpSuggestionDto> FollowUps { get; set; } = [];
+}
+
+public sealed class FollowUpSuggestionDto
+{
+    public string Label { get; set; } = string.Empty;
+
+    public string Question { get; set; } = string.Empty;
 }

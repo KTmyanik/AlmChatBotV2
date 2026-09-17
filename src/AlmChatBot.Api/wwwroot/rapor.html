@@ -1,0 +1,111 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>ALM Nakit Akış Raporu</title>
+  <link rel="stylesheet" href="/css/rapor.css" />
+</head>
+<body>
+  <header class="app-bar">
+    <div class="brand">
+      <span class="brand-mark" aria-hidden="true"></span>
+      <div>
+        <p class="kicker">IFRSStaging · ALM</p>
+        <h1>Nakit akış tablosu</h1>
+      </div>
+    </div>
+    <nav class="app-nav" aria-label="Sayfalar">
+      <a href="/">Soru</a>
+      <a href="/rapor.html" aria-current="page">Rapor</a>
+    </nav>
+  </header>
+
+  <div class="shell">
+    <aside class="filters" aria-label="Rapor filtreleri">
+      <label>
+        Tarih
+        <select id="flt-date"></select>
+      </label>
+      <label>
+        Kırılım
+        <select id="flt-depth">
+          <option value="1">Header1</option>
+          <option value="2" selected>Header2</option>
+          <option value="3">Header3</option>
+          <option value="7">Tüm hiyerarşi</option>
+        </select>
+      </label>
+      <fieldset>
+        <legend>Nakit akış tipi</legend>
+        <div class="seg" id="flt-approach">
+          <button type="button" data-value="Rate">Kar payı</button>
+          <button type="button" data-value="Liquidity" class="on">Likidite</button>
+        </div>
+      </fieldset>
+      <label>
+        Döviz
+        <select id="flt-ccy"></select>
+      </label>
+      <fieldset>
+        <legend>Havuz</legend>
+        <div class="seg multi" id="flt-pool">
+          <button type="button" data-value="KATILMA" class="on">Katılma</button>
+          <button type="button" data-value="OZKAYNAK" class="on">Özkaynak</button>
+        </div>
+      </fieldset>
+      <label>
+        Anapara / kâr
+        <select id="flt-balance"></select>
+      </label>
+      <fieldset>
+        <legend>Vade varsayımı</legend>
+        <div class="seg" id="flt-tenor">
+          <button type="button" data-value="core">Çekirdek mevduat</button>
+          <button type="button" data-value="standard" class="on">Sözleşmesel vade</button>
+        </div>
+      </fieldset>
+      <p class="filter-note">Döviz “Tümü” seçilince tutarlar raporlama biriminde toplanır. Boş ALM kodu satırları dahil edilmez.</p>
+    </aside>
+
+    <main>
+      <section class="kpis" id="kpis" aria-live="polite"></section>
+
+      <section class="board">
+        <div class="board-head">
+          <div class="tabs" role="tablist">
+            <button type="button" class="on" data-view="table" role="tab" aria-selected="true">Tablo</button>
+            <button type="button" data-view="chart" role="tab" aria-selected="false">Grafik</button>
+            <button type="button" data-view="duration" role="tab" aria-selected="false">Durasyon</button>
+          </div>
+          <div class="board-tools">
+            <input id="search" type="search" placeholder="Kalem ara" />
+            <button type="button" id="btn-expand" class="ghost">Tümünü aç</button>
+            <button type="button" id="btn-collapse" class="ghost">Daralt</button>
+            <label class="toggle">
+              <input type="checkbox" id="flt-compact" />
+              Kısa birim
+            </label>
+          </div>
+        </div>
+        <p id="meta" class="meta"></p>
+        <p id="error" class="error" hidden></p>
+        <div id="table-view" class="table-scroll"></div>
+        <figure id="chart-view" hidden>
+          <svg id="chart-svg" role="img" aria-label="Vade dilimi nakit akışı"></svg>
+          <figcaption>
+            <span class="swatch assets"></span> Varlıklar
+            <span class="swatch liab"></span> Yükümlülükler
+            <span class="swatch deriv"></span> Türev (net)
+            <span class="swatch gap"></span> Toplam net açık/fazla
+            <span class="swatch cum"></span> Kümülatif net
+          </figcaption>
+        </figure>
+        <div id="duration-view" class="table-scroll" hidden></div>
+      </section>
+    </main>
+  </div>
+
+  <script src="/js/rapor.js?v=1"></script>
+</body>
+</html>

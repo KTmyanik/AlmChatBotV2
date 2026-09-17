@@ -4,7 +4,7 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>ALM Soru</title>
-  <link rel="stylesheet" href="/css/app.css" />
+      <link rel="stylesheet" href="/css/app.css?v=4" />
 </head>
 <body>
   <header class="top">
@@ -12,7 +12,13 @@
       <p class="kicker">IFRSStaging · ALM</p>
       <h1>Soru</h1>
     </div>
-    <p id="model-status" class="status">Model yükleniyor…</p>
+    <div class="top-right">
+      <nav class="app-nav" aria-label="Sayfalar">
+        <a href="/" aria-current="page">Soru</a>
+        <a href="/rapor.html">Rapor</a>
+      </nav>
+      <p id="model-status" class="status">Model yükleniyor…</p>
+    </div>
   </header>
 
   <main>
@@ -56,6 +62,7 @@
       <article class="panel">
         <div class="panel-head">
           <h2>Veri</h2>
+          <p id="sql-origin" class="origin" hidden></p>
           <div class="chart-actions">
             <button type="button" id="chart-btn" class="secondary" disabled>Grafik</button>
             <button type="button" id="chart-bar" class="ghost" hidden>Çubuk</button>
@@ -63,6 +70,11 @@
           </div>
         </div>
         <p id="meta" class="meta"></p>
+        <aside id="followups" class="followups" hidden>
+          <p class="followups-kicker">Bu toplamı bölebilirsiniz</p>
+          <p id="followups-note" class="followups-note">İlk sonuç ana kalemin toplamıdır. Döviz, havuz, TP/YP veya alt kalem kırılımı seçin.</p>
+          <div id="followup-chips" class="chips"></div>
+        </aside>
         <div class="data-split">
           <div class="table-wrap">
             <table id="data-table"></table>
@@ -75,7 +87,7 @@
       </article>
 
       <details class="panel" open>
-        <summary>Üretilen SQL</summary>
+        <summary>Üretilen SQL <span id="sql-origin-sql" class="origin-inline"></span></summary>
         <pre id="sql"></pre>
         <p id="explanation" class="note"></p>
         <ul id="assumptions"></ul>
@@ -88,6 +100,6 @@
     </section>
   </main>
 
-  <script src="/js/app.js?v=2"></script>
+  <script src="/js/app.js?v=4"></script>
 </body>
 </html>

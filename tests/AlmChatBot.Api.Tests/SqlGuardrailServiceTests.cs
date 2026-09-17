@@ -8,6 +8,15 @@ public sealed class SqlGuardrailServiceTests
     private readonly SqlGuardrailService _sut = new();
 
     [Fact]
+    public void Qualifies_unqualified_alm_tables_with_schema()
+    {
+        var result = _sut.ValidateAndRewrite("SELECT ALMCOACODE FROM InternalReports WHERE CCY_CODE = N'TRY'");
+
+        Assert.Contains("ALM.InternalReports", result.SafeSql, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("FROM InternalReports", result.SafeSql, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
     public void Injects_top_200_on_plain_select()
     {
         var result = _sut.ValidateAndRewrite("SELECT ALMCOACODE FROM ALM.InternalReports WHERE CCY_CODE = N'TRY'");

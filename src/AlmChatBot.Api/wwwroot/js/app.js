@@ -16,6 +16,8 @@ const errorBox = document.getElementById("error");
 const result = document.getElementById("result");
 const insight = document.getElementById("insight");
 const meta = document.getElementById("meta");
+const sqlOrigin = document.getElementById("sql-origin");
+const sqlOriginSql = document.getElementById("sql-origin-sql");
 const table = document.getElementById("data-table");
 const sql = document.getElementById("sql");
 const explanation = document.getElementById("explanation");
@@ -38,6 +40,9 @@ const chartPanel = document.getElementById("chart-panel");
 const chartSvg = document.getElementById("chart-svg");
 const chartCaption = document.getElementById("chart-caption");
 const dataSplit = document.querySelector(".data-split");
+const followupsBox = document.getElementById("followups");
+const followupsNote = document.getElementById("followups-note");
+const followupChips = document.getElementById("followup-chips");
 let busyTimer;
 let pendingSuggestion = "";
 let lastQuestion = "";
@@ -45,6 +50,7 @@ let lastResult = null;
 let chartModel = null;
 let chartKind = "bar";
 let chartVisible = false;
+let modelName = "";
 
 examples.forEach((text) => {
   const btn = document.createElement("button");
@@ -139,14 +145,7 @@ form.addEventListener("submit", async (event) => {
   setChartVisible(false);
 
   try {
-    const payload = await ask(q, false);
-    if (payload.needsConfirmation) {
-      showConfirm(payload);
-      setBusy(false);
-      return;
-    }
-    renderResult(payload, q);
-    setBusy(false);
+    await runQuestion(q, false);
   } catch (err) {
     showError(err.message || String(err));
     setBusy(false);
@@ -157,9 +156,10 @@ async function loadStatus() {
   try {
     const response = await fetch("/api/alm/status");
     const data = await response.json();
+    modelName = data.modelName || "";
     const planner = data.sqlGeneration === "rules-first" ? "kural + " : "";
-    modelStatus.textContent = data.modelName
-      ? `${planner}${data.modelName} · ${shortHost(data.baseUrl)}`
+    modelStatus.textContent = modelName
+      ? `${planner}${modelName} · ${shortHost(data.baseUrl)}`
       : "API'ye bağlanılamadı";
   } catch {
     modelStatus.textContent = "API'ye bağlanılamadı";
@@ -273,9 +273,9 @@ function renderResult(data, questionText) {
   if (typeof data.rowCount === "number") bits.push(`${data.rowCount} satır`);
   if (data.truncated) bits.push("sonuç kesildi (TOP 200)");
   if (typeof data.executionDurationMs === "number") bits.push(`${data.executionDurationMs} ms`);
-  if (data.sqlSource === "rules") bits.push("SQL kural ile");
-  else if (data.sqlSource === "llm") bits.push("SQL model ile");
+  bits.push(sqlSourceCaption(data));
   meta.textContent = bits.join(" · ");
+  paintOrigin(data);
   sql.textContent = data.generatedSql || "";
   explanation.textContent = data.explanation || "";
   assumptions.replaceChildren();
@@ -286,6 +286,51 @@ function renderResult(data, questionText) {
   });
   renderTable(data.data || []);
   prepareChart(data.data || []);
+  renderFollowUps(data.followUps || data.FollowUps || []);
+}
+
+function renderFollowUps(items) {
+  if (!followupsBox || !followupChips) return;
+  followupChips.replaceChildren();
+  if (!items.length) {
+    followupsBox.hidden = true;
+    return;
+  }
+  followupsBox.hidden = false;
+  if (followupsNote) {
+    followupsNote.textContent = "İlk sonuç ana kalemin toplamıdır. Döviz, havuz, TP/YP veya alt kalem ile kırabilirsiniz.";
+  }
+  items.forEach((item) => {
+    const btn = document.createElement("button");
+    btn.type = "button";
+    btn.textContent = item.label || item.Label || "";
+    btn.addEventListener("click", async () => {
+      const next = (item.question || item.Question || "").trim();
+      if (!next) return;
+      question.value = next;
+      hideError();
+      hideConfirm();
+      setBusy(true);
+      try {
+        await runQuestion(next, true);
+      } catch (err) {
+        showError(err.message || String(err));
+        setBusy(false);
+      }
+    });
+    followupChips.appendChild(btn);
+  });
+}
+
+async function runQuestion(q, confirmed) {
+  const payload = await ask(q, confirmed);
+  if (payload.needsConfirmation) {
+    showConfirm(payload);
+    setBusy(false);
+    return;
+  }
+  renderResult(payload, q);
+  setBusy(false);
 }
 
 chartBtn.addEventListener("click", () => {
@@ -330,6 +375,30 @@ async function loadInsight(questionText, payload) {
     insight.textContent = body.insightSummary || "Özet üretilmedi.";
   } catch (err) {
     insight.textContent = `Analiz yazılamadı: ${err.message || err}`;
+  }
+}
+
+function sqlSourceKey(data) {
+  return String(data.sqlSource ?? data.SqlSource ?? "").toLowerCase();
+}
+
+function sqlSourceCaption(data) {
+  const src = sqlSourceKey(data);
+  if (src === "rules") return "Kural motoru (C#, model yok)";
+  if (src === "llm") return `Model (${modelName || "LLM"})`;
+  return "SQL kaynağı alınamadı";
+}
+
+function paintOrigin(data) {
+  const src = sqlSourceKey(data);
+  const label = sqlSourceCaption(data);
+  if (sqlOrigin) {
+    sqlOrigin.hidden = false;
+    sqlOrigin.className = `origin ${src || "unknown"}`;
+    sqlOrigin.textContent = label;
+  }
+  if (sqlOriginSql) {
+    sqlOriginSql.textContent = "— " + label;
   }
 }
 

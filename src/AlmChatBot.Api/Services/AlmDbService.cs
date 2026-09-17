@@ -7,14 +7,22 @@ namespace AlmChatBot.Api.Services;
 public interface IAlmDbService
 {
     Task<IReadOnlyList<Dictionary<string, object?>>> QueryAsync(string sql, CancellationToken cancellationToken);
+
+    Task<IReadOnlyList<Dictionary<string, object?>>> QueryAsync(string sql, object? parameters, CancellationToken cancellationToken);
 }
 
 public sealed class AlmDbService(IConfiguration configuration, ILogger<AlmDbService> logger) : IAlmDbService
 {
     private const int CommandTimeoutSeconds = 30;
 
+    public Task<IReadOnlyList<Dictionary<string, object?>>> QueryAsync(
+        string sql,
+        CancellationToken cancellationToken) =>
+        QueryAsync(sql, null, cancellationToken);
+
     public async Task<IReadOnlyList<Dictionary<string, object?>>> QueryAsync(
         string sql,
+        object? parameters,
         CancellationToken cancellationToken)
     {
         var connectionString = configuration.GetConnectionString("AlmDbReadOnly")
@@ -25,6 +33,7 @@ public sealed class AlmDbService(IConfiguration configuration, ILogger<AlmDbServ
 
         var command = new CommandDefinition(
             sql,
+            parameters,
             commandTimeout: CommandTimeoutSeconds,
             cancellationToken: cancellationToken);
 

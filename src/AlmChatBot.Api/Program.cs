@@ -9,6 +9,7 @@ builder.Services.AddControllers();
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 builder.Services.AddProblemDetails();
+builder.Services.AddMemoryCache();
 
 builder.Services.AddSingleton<ISqlGuardrailService, SqlGuardrailService>();
 builder.Services.AddSingleton<IAlmSqlPlanner, AlmSqlPlanner>();
@@ -16,6 +17,7 @@ builder.Services.AddSingleton<IAlmDbService, AlmDbService>();
 builder.Services.AddScoped<IAlmAnalysisService, AlmAnalysisService>();
 builder.Services.AddScoped<IAlmBulletinService, AlmBulletinService>();
 builder.Services.AddScoped<IAlmOrchestratorService, AlmOrchestratorService>();
+builder.Services.AddScoped<IAlmCashflowReportService, AlmCashflowReportService>();
 
 builder.Services.AddHttpClient<IQwenClientService, QwenClientService>((sp, client) =>
 {
@@ -44,5 +46,6 @@ if (!app.Environment.IsDevelopment())
 app.UseDefaultFiles();
 app.UseStaticFiles();
 app.UseAuthorization();
+app.MapGet("/rapor", () => Results.Redirect("/rapor.html"));
 app.MapControllers();
 app.Run();

@@ -193,7 +193,19 @@ public sealed class SqlGuardrailService : ISqlGuardrailService
                 throw new SqlGuardrailException($"Tablo allowlist dışında: {table}", originalSql);
             }
 
+            QualifyAlmSchema(obj);
+
             base.Visit(node);
+        }
+
+        private static void QualifyAlmSchema(SchemaObjectName obj)
+        {
+            if (obj.SchemaIdentifier is not null)
+            {
+                return;
+            }
+
+            obj.Identifiers.Insert(obj.Identifiers.Count - 1, new Identifier { Value = "ALM" });
         }
 
         public override void Visit(OpenRowsetTableReference node) =>

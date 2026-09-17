@@ -88,7 +88,8 @@ public sealed class AlmOrchestratorService(
             Assumptions = llm.Assumptions,
             Truncated = rows.Count >= SqlGuardrailService.MaxRows,
             RowCount = rows.Count,
-            SqlSource = source
+            SqlSource = source,
+            FollowUps = interpreted.FollowUps.ToList()
         };
     }
 

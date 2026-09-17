@@ -46,6 +46,29 @@ h1 {
   font-weight: 650;
 }
 
+.top-right {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 8px;
+}
+
+.app-nav { display: flex; gap: 8px; }
+.app-nav a {
+  color: var(--accent);
+  text-decoration: none;
+  padding: 6px 12px;
+  border-radius: 999px;
+  font-size: 13px;
+  font-weight: 600;
+  border: 1px solid var(--line);
+}
+.app-nav a[aria-current="page"] {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #f7f3ea;
+}
+
 .status {
   margin: 0;
   font-size: 13px;
@@ -171,6 +194,33 @@ ul.risks { color: var(--danger); }
 
 .insight { margin: 0; white-space: pre-wrap; }
 .meta { margin: 10px 0 0; color: var(--muted); font-size: 13px; }
+
+.origin {
+  margin: 0;
+  padding: 4px 10px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+}
+
+.origin.rules {
+  background: #eef6f3;
+  color: var(--accent);
+}
+
+.origin.llm {
+  background: #efe8db;
+  color: #6b4a1e;
+}
+
+.origin-inline {
+  margin-left: 8px;
+  font-weight: 700;
+  text-transform: none;
+  letter-spacing: 0;
+  color: var(--accent);
+}
 .note { color: var(--muted); font-size: 14px; }
 
 .panel-head {
@@ -328,4 +378,35 @@ ul { margin: 8px 0 0; padding-left: 18px; color: var(--muted); }
   background: transparent;
   color: var(--ink);
   border: 1px solid var(--line);
+}
+
+.followups {
+  margin: 0 0 16px;
+  padding: 14px 16px;
+  background: #eef6f3;
+  border: 1px solid #c5d9d3;
+  border-radius: 8px;
+}
+
+.followups-kicker {
+  margin: 0 0 6px;
+  font-size: 12px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--accent);
+  font-weight: 650;
+}
+
+.followups-note {
+  margin: 0 0 8px;
+  color: var(--muted);
+  font-size: 14px;
+}
+
+.followups .chips {
+  margin: 0;
+}
+
+.followups .chips button {
+  background: var(--card);
 }

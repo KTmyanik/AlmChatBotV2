@@ -67,8 +67,7 @@ public sealed class QwenClientService(
                 """;
 
         var content = await CompleteAsync(system, user, jsonObject: true, cancellationToken);
-        var parsed = JsonSerializer.Deserialize<LlmSqlResponse>(ExtractJsonObject(content), JsonOptions)
-                     ?? throw new InvalidOperationException("Qwen SQL JSON yanıtı boş.");
+        var parsed = AlmLlmSqlParser.Parse(content);
 
         if (string.IsNullOrWhiteSpace(parsed.Sql))
         {
@@ -340,18 +339,8 @@ public sealed class QwenClientService(
         return JsonSerializer.Serialize(new { message = new { content = content.ToString() } });
     }
 
-    private bool HasCompleteSqlJson(string content)
-    {
-        try
-        {
-            var parsed = JsonSerializer.Deserialize<LlmSqlResponse>(ExtractJsonObject(content), JsonOptions);
-            return parsed is not null && !string.IsNullOrWhiteSpace(parsed.Sql);
-        }
-        catch (JsonException)
-        {
-            return false;
-        }
-    }
+    private static bool HasCompleteSqlJson(string content) =>
+        AlmLlmSqlParser.TryParse(content, out var parsed) && !string.IsNullOrWhiteSpace(parsed.Sql);
 
     private string SqlSystemPrompt()
     {
@@ -360,9 +349,10 @@ public sealed class QwenClientService(
             return """
                 Sen ALM Text-to-SQL üreticisisin. Yalnızca Microsoft SQL Server T-SQL SELECT yaz.
                 Yanıt tek JSON: {"Sql":"...","Explanation":"...","Assumptions":["..."]}
-                Markdown veya kod çiti yok.
+                Markdown veya kod çiti yok. Explanation tek kısa cümle. Assumptions en fazla 2 madde.
 
                 Şema [ALM]: InternalReports ir, InternalDurationReports dr, InternalReportMap map, CoreDepositRates cd.
+                FROM her zaman [ALM].[InternalReports] / [ALM].[InternalDurationReports] / [ALM].[InternalReportMap] / [ALM].[CoreDepositRates]. Şemasız tablo adı yazma.
                 Join yalnızca ir.ALMCOACODE = map.AlmCoaCode (veya dr.ALMCOACODE). RowId kullanma.
                 Başlık kalem: Header1-Header7 ile yaprak seç; boş ALMCOACODE toplama.
 
@@ -413,33 +403,6 @@ public sealed class QwenClientService(
             string.Empty,
             System.Text.RegularExpressions.RegexOptions.IgnoreCase);
         return stripped.Trim();
-    }
-
-    private static string ExtractJsonObject(string content)
-    {
-        var trimmed = StripFence(StripThink(content));
-        var start = trimmed.IndexOf('{');
-        var end = trimmed.LastIndexOf('}');
-        return start >= 0 && end > start ? trimmed[start..(end + 1)] : trimmed;
-    }
-
-    private static string StripFence(string content)
-    {
-        var trimmed = content.Trim();
-        if (!trimmed.StartsWith("```", StringComparison.Ordinal))
-        {
-            return trimmed;
-        }
-
-        var firstNl = trimmed.IndexOf('\n');
-        if (firstNl < 0)
-        {
-            return trimmed;
-        }
-
-        trimmed = trimmed[(firstNl + 1)..];
-        var fence = trimmed.LastIndexOf("```", StringComparison.Ordinal);
-        return fence >= 0 ? trimmed[..fence].Trim() : trimmed.Trim();
     }
 
     private static string TrimForLog(string body) =>

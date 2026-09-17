@@ -41,6 +41,8 @@ public sealed class QuestionInterpretation
     public string? Bucket { get; init; }
 
     public string? Metric { get; init; }
+
+    public List<FollowUpSuggestionDto> FollowUps { get; init; } = [];
 }
 
 internal enum DateScanMode
@@ -59,7 +61,7 @@ public sealed class AlmSqlPlanner : IAlmSqlPlanner
 {
     private static readonly CultureInfo Tr = CultureInfo.GetCultureInfo("tr-TR");
 
-    private static readonly string[] TenorColumns =
+    public static readonly string[] TenorColumns =
     [
         "DAY_1", "DAY_2", "DAY_3", "DAY_4", "DAY_5", "DAY_6", "DAY_7",
         "DAY_8_15", "DAY_16_30",
@@ -69,7 +71,7 @@ public sealed class AlmSqlPlanner : IAlmSqlPlanner
         "YEAR_8_9", "YEAR_9_10", "YEAR_10_15", "YEAR_15_20", "YEAR_20_PLUS"
     ];
 
-    private static readonly string[] ShortTenorColumns =
+    public static readonly string[] ShortTenorColumns =
     [
         "DAY_1", "DAY_2", "DAY_3", "DAY_4", "DAY_5", "DAY_6", "DAY_7", "DAY_8_15", "DAY_16_30"
     ];
@@ -105,16 +107,26 @@ public sealed class AlmSqlPlanner : IAlmSqlPlanner
 
     private static readonly LineItem[] LineItems =
     [
+        new("vadeye kadar elde tutulacak tlref", "Header3", "Vadeye Kadar Elde Tutulacak", "TLREF"),
+        new("vadeye kadar elde tutulacak", "Header3", "Vadeye Kadar Elde Tutulacak"),
         new("türev finansal araçlar (net)", "Header1", "TÜREV FİNANSAL ARAÇLAR (NET)"),
         new("türev finansal yükümlülük", "Header2", "TÜREV FİNANSAL YÜKÜMLÜLÜKLER"),
         new("türev finansal varlık", "Header2", "TÜREV FİNANSAL VARLIKLAR"),
         new("türev finansal araç", "Header2", "TÜREV FİNANSAL ARAÇLAR"),
         new("bilanço dışı işlem", "Header1", "BİLANÇO DIŞI İŞLEMLER"),
+        new("varlıklar", "Header1", "VARLIKLAR"),
+        new("varlık", "Header1", "VARLIKLAR"),
+        new("yükümlülükler", "Header1", "YÜKÜMLÜLÜKLER"),
+        new("yükümlülük", "Header1", "YÜKÜMLÜLÜKLER"),
         new("nakit ve nakit benzer", "Header2", "NAKİT VE NAKİT BENZERLERİ"),
         new("para piyasalarından alacak", "Header2", "PARA PİYASALARINDAN ALACAKLAR"),
         new("para piyasalarına borç", "Header2", "PARA PİYASALARINA BORÇLAR - REPO"),
         new("menkul kıymet", "Header2", "MENKUL KIYMETLER"),
         new("ortaklık yatırım", "Header2", "ORTAKLIK YATIRIMLARI"),
+        new("alım-satım", "Header3", "Alim-Satim"),
+        new("alim-satim", "Header3", "Alim-Satim"),
+        new("alım satım", "Header3", "Alim-Satim"),
+        new("npl", "Header2", "TAKİPTEKİ ALACAKLAR"),
         new("takipteki alacak", "Header2", "TAKİPTEKİ ALACAKLAR"),
         new("alınan kredi", "Header2", "ALINAN KREDİLER"),
         new("sermaye benzeri", "Header2", "SERMAYE BENZERİ BORÇLANMA ARAÇLARI"),
@@ -128,6 +140,39 @@ public sealed class AlmSqlPlanner : IAlmSqlPlanner
         new("mevduat", "Header2", "MEVDUAT"),
         new("kredi", "Header2", "KREDİLER")
     ];
+
+    private static readonly Dictionary<string, string[]> ChildrenByHeader = new(StringComparer.OrdinalIgnoreCase)
+    {
+        ["VARLIKLAR"] =
+        [
+            "NAKİT VE NAKİT BENZERLERİ",
+            "PARA PİYASALARINDAN ALACAKLAR",
+            "MENKUL KIYMETLER",
+            "ORTAKLIK YATIRIMLARI",
+            "KREDİLER",
+            "BEKLENEN ZARAR KARŞILIKLARI-NAKDİ",
+            "TAKİPTEKİ ALACAKLAR",
+            "TÜREV FİNANSAL VARLIKLAR",
+            "DİĞER AKTİF"
+        ],
+        ["YÜKÜMLÜLÜKLER"] =
+        [
+            "MEVDUAT",
+            "ALINAN KREDİLER",
+            "PARA PİYASALARINA BORÇLAR - REPO",
+            "TÜREV FİNANSAL YÜKÜMLÜLÜKLER",
+            "SERMAYE BENZERİ BORÇLANMA ARAÇLARI",
+            "DİĞER PASİFLER",
+            "ÖZKAYNAKLAR",
+            "BEKLENEN ZARAR KARŞILIKLARI-G.NAKDİ"
+        ],
+        ["BİLANÇO DIŞI İŞLEMLER"] =
+        [
+            "GARANTİ VE KEFALETLER",
+            "TAAHHÜTLER",
+            "TÜREV FİNANSAL ARAÇLAR"
+        ]
+    };
 
     private static readonly (string Needle, string Column)[] BucketHints =
     [
@@ -197,6 +242,7 @@ public sealed class AlmSqlPlanner : IAlmSqlPlanner
         var compactDate = MatchDate(folded);
         var dateScan = compactDate is null ? MatchDateScan(folded) : DateScanMode.Snapshot;
         var tenorDist = metric is null && bucket is null && AsksTenorDistribution(folded);
+        var breakdown = MatchBreakdown(folded, tenorDist);
         if (approach is null)
         {
             approach = "Liquidity";
@@ -208,6 +254,11 @@ public sealed class AlmSqlPlanner : IAlmSqlPlanner
         {
             assumptions.Add("BALANCE_TYPE belirtilmedi; N'TOTAL' alındı.");
         }
+
+        var groupCcy = ccy is null && (breakdown.HasFlag(Breakdown.Ccy) || tenorDist);
+        var groupPool = pool is null && breakdown.HasFlag(Breakdown.Pool);
+        var groupTpYp = breakdown.HasFlag(Breakdown.TpYp);
+        var childColumn = breakdown.HasFlag(Breakdown.Child) ? NextHeaderColumn(item.HeaderColumn) : null;
 
         LlmSqlResponse sql;
         if (metric is not null)
@@ -230,16 +281,30 @@ public sealed class AlmSqlPlanner : IAlmSqlPlanner
         {
             if (ccy is null)
             {
-                assumptions.Add("CCY_CODE belirtilmedi; satırlar dövize göre kırıldı (karma SUM yok).");
+                assumptions.Add(groupCcy
+                    ? "CCY_CODE belirtilmedi; satırlar dövize göre kırıldı (karma SUM yok)."
+                    : "CCY_CODE belirtilmedi; ana kalemin toplamı verildi. Dövizler toplanır; döviz koduna göre kırılabilir.");
             }
 
-            if (pool is null && !tenorDist)
-            {
-                assumptions.Add("POOL_TYPE belirtilmedi; satırlar havuza göre kırıldı.");
-            }
-            else if (pool is null && tenorDist)
+            if (pool is null && tenorDist)
             {
                 assumptions.Add("Vade dağılımında havuzlar toplandı; dövizler ayrı tutuldu.");
+            }
+            else if (pool is null)
+            {
+                assumptions.Add(groupPool
+                    ? "POOL_TYPE belirtilmedi; satırlar havuza göre kırıldı."
+                    : "POOL_TYPE belirtilmedi; havuzlar toplandı. Havuz tipine göre kırılabilir.");
+            }
+
+            if (groupTpYp)
+            {
+                assumptions.Add("ALMCOACODE TP/ ve YP/ önekine göre yerel/yabancı para kırıldı.");
+            }
+
+            if (childColumn is not null)
+            {
+                assumptions.Add($"{item.HeaderValue} alt kalemleri {childColumn} üzerinden kırıldı.");
             }
 
             var bucketNote = tenorDist
@@ -247,17 +312,23 @@ public sealed class AlmSqlPlanner : IAlmSqlPlanner
                 : bucket is null
                     ? "Belirtilen vade dilimi yok; tüm vade dilimleri toplandı."
                     : $"{bucket} vade dilimi seçildi.";
+            var totalNote = groupCcy || groupPool || groupTpYp || childColumn is not null || tenorDist
+                ? bucketNote
+                : $"Ana kırılımın toplamı verildi. {bucketNote}";
 
             sql = new LlmSqlResponse
             {
-                Sql = BuildGapSql(item, dateSql, approach, ccy, pool, balance, bucket, dateScan, tenorDist),
-                Explanation = $"SQL kural motoru ile üretildi (LLM yok). {bucketNote}",
+                Sql = BuildGapSql(
+                    item, dateSql, approach, ccy, pool, balance, bucket, dateScan, tenorDist,
+                    groupCcy, groupPool, groupTpYp, childColumn),
+                Explanation = $"SQL kural motoru ile üretildi (LLM yok). {totalNote}",
                 Assumptions = assumptions
             };
         }
 
         var suggested = BuildSuggestedQuestion(item, approach, ccy, pool, compactDate, metric, bucket, dateScan, tenorDist);
         var summary = BuildSummary(item, approach, ccy, pool, compactDate, balance, metric, dateScan, tenorDist);
+        var followUps = BuildFollowUps(item, approach, ccy, pool, compactDate, dateScan, breakdown, tenorDist, metric);
 
         return new QuestionInterpretation
         {
@@ -266,6 +337,7 @@ public sealed class AlmSqlPlanner : IAlmSqlPlanner
             SuggestedQuestion = suggested,
             InterpretationSummary = summary,
             Corrections = corrections,
+            FollowUps = followUps,
             HeaderColumn = item.HeaderColumn,
             HeaderValue = item.HeaderValue,
             ReportingDate = compactDate,
@@ -287,7 +359,11 @@ public sealed class AlmSqlPlanner : IAlmSqlPlanner
         string balance,
         string? bucket,
         DateScanMode dateScan,
-        bool tenorDistribution = false)
+        bool tenorDistribution = false,
+        bool groupCcy = false,
+        bool groupPool = false,
+        bool groupTpYp = false,
+        string? childColumn = null)
     {
         var amount = bucket is null
             ? string.Join(" + ", TenorColumns.Select(c => $"ISNULL(ir.{c}, 0)"))
@@ -305,10 +381,35 @@ public sealed class AlmSqlPlanner : IAlmSqlPlanner
         };
 
         AddDim(select, group, approach, "ir.APPROACH_CODE");
-        AddDim(select, group, ccy, "ir.CCY_CODE");
-        if (!tenorDistribution || pool is not null)
+        if (groupCcy)
         {
-            AddDim(select, group, pool, "ir.POOL_TYPE");
+            select.Add("ir.CCY_CODE");
+            group.Add("ir.CCY_CODE");
+        }
+
+        if (groupPool)
+        {
+            select.Add("ir.POOL_TYPE");
+            group.Add("ir.POOL_TYPE");
+        }
+
+        if (groupTpYp)
+        {
+            const string tpYpExpr = """
+                CASE
+                  WHEN ir.ALMCOACODE LIKE N'TP/%' THEN N'TP'
+                  WHEN ir.ALMCOACODE LIKE N'YP/%' THEN N'YP'
+                  ELSE N'DİĞER'
+                END
+                """;
+            select.Add($"{tpYpExpr} AS TpYp");
+            group.Add(tpYpExpr);
+        }
+
+        if (!string.IsNullOrEmpty(childColumn))
+        {
+            select.Add($"map.{childColumn} AS AltKalem");
+            group.Add($"map.{childColumn}");
         }
 
         select.Add("ir.BALANCE_TYPE");
@@ -336,6 +437,17 @@ public sealed class AlmSqlPlanner : IAlmSqlPlanner
         where.Add("ir.ALMCOACODE IS NOT NULL");
         where.Add("LTRIM(RTRIM(ir.ALMCOACODE)) <> N''");
         where.Add(HeaderEquals(item.HeaderColumn, item.HeaderValue));
+        if (item.CoaContains is not null)
+        {
+            select.Insert(1, "ir.ALMCOACODE");
+            group.Insert(1, "ir.ALMCOACODE");
+            where.Add($"ir.ALMCOACODE LIKE N'%{Escape(item.CoaContains)}%'");
+        }
+        if (!string.IsNullOrEmpty(childColumn))
+        {
+            where.Add($"map.{childColumn} IS NOT NULL");
+            where.Add($"LTRIM(RTRIM(map.{childColumn})) <> N''");
+        }
         if (approach is not null) where.Add($"ir.APPROACH_CODE = N'{approach}'");
         if (ccy is not null) where.Add($"ir.CCY_CODE = N'{ccy}'");
         if (pool is not null) where.Add($"ir.POOL_TYPE = N'{pool}'");
@@ -360,16 +472,16 @@ public sealed class AlmSqlPlanner : IAlmSqlPlanner
             """;
 
         var orderBy = tenorDistribution
-            ? TenorDistributionOrderBy(approach, ccy)
-            : GapOrderBy(dateScan, approach, ccy, pool);
+            ? TenorDistributionOrderBy(approach, groupCcy)
+            : GapOrderBy(dateScan, approach, groupCcy, groupPool, groupTpYp, childColumn);
         return orderBy is null ? sql : sql + $"{Environment.NewLine}            ORDER BY {orderBy}";
     }
 
-    private static string TenorDistributionOrderBy(string? approach, string? ccy)
+    private static string TenorDistributionOrderBy(string? approach, bool groupCcy)
     {
         var parts = new List<string> { "tenor.Sira" };
         if (approach is null) parts.Add("ir.APPROACH_CODE");
-        if (ccy is null) parts.Add("ir.CCY_CODE");
+        if (groupCcy) parts.Add("ir.CCY_CODE");
         return string.Join(", ", parts);
     }
 
@@ -384,6 +496,10 @@ public sealed class AlmSqlPlanner : IAlmSqlPlanner
         where.Add("dr.ALMCOACODE IS NOT NULL");
         where.Add("LTRIM(RTRIM(dr.ALMCOACODE)) <> N''");
         where.Add($"map.{item.HeaderColumn} COLLATE Latin1_General_CI_AI = N'{Escape(item.HeaderValue)}' COLLATE Latin1_General_CI_AI");
+        if (item.CoaContains is not null)
+        {
+            where.Add($"dr.ALMCOACODE LIKE N'%{Escape(item.CoaContains)}%'");
+        }
 
         var measureAlias = metricColumn == "ALL" ? "Toplam_Bakiye" : DurationAlias(metricColumn);
         var sql = $"""
@@ -463,7 +579,13 @@ public sealed class AlmSqlPlanner : IAlmSqlPlanner
         group.Add(column);
     }
 
-    private static string? GapOrderBy(DateScanMode scan, string? approach, string? ccy, string? pool)
+    private static string? GapOrderBy(
+        DateScanMode scan,
+        string? approach,
+        bool groupCcy,
+        bool groupPool,
+        bool groupTpYp,
+        string? childColumn)
     {
         if (scan is DateScanMode.Highest)
         {
@@ -479,9 +601,14 @@ public sealed class AlmSqlPlanner : IAlmSqlPlanner
         {
             var parts = new List<string> { "ir.REPORTING_DATE" };
             if (approach is null) parts.Add("ir.APPROACH_CODE");
-            if (ccy is null) parts.Add("ir.CCY_CODE");
-            if (pool is null) parts.Add("ir.POOL_TYPE");
+            if (groupCcy) parts.Add("ir.CCY_CODE");
+            if (groupPool) parts.Add("ir.POOL_TYPE");
             return string.Join(", ", parts);
+        }
+
+        if (groupCcy || groupPool || groupTpYp || !string.IsNullOrEmpty(childColumn))
+        {
+            return "Tutar DESC";
         }
 
         return null;
@@ -553,6 +680,66 @@ public sealed class AlmSqlPlanner : IAlmSqlPlanner
             "vade dilim", "vade dağılım", "vade dagilim",
             "dilimlerine göre", "dilimlerine gore", "dilimlere göre", "dilimlere gore",
             "vade kırılım", "vade kirilim", "tenor");
+
+    [Flags]
+    private enum Breakdown
+    {
+        None = 0,
+        Ccy = 1,
+        Pool = 2,
+        TpYp = 4,
+        Child = 8
+    }
+
+    private static Breakdown MatchBreakdown(string folded, bool tenorDistribution)
+    {
+        var flags = Breakdown.None;
+        if (ContainsAny(
+                folded,
+                "döviz kod", "doviz kod", "dövize göre", "dovize gore", "döviz baz", "doviz baz",
+                "ccy", "para birim", "kurlara göre", "kurlara gore"))
+        {
+            flags |= Breakdown.Ccy;
+        }
+
+        if (ContainsAny(
+                folded,
+                "havuz tip", "havuza göre", "havuza gore", "havuz baz",
+                "katılma ve özkaynak", "katilma ve ozkaynak", "özkaynak ve katılma", "ozkaynak ve katilma"))
+        {
+            flags |= Breakdown.Pool;
+        }
+
+        if (ContainsAny(
+                folded,
+                "tp/yp", "tp yp", "tp ve yp", "yp ve tp", "tp-yp",
+                "yerel para", "yabancı para", "yabanci para"))
+        {
+            flags |= Breakdown.TpYp;
+        }
+
+        if (!tenorDistribution
+            && ContainsAny(
+                folded,
+                "alt kalem", "kalemlere göre", "kalemlere gore", "kalem baz",
+                "header2", "header3", "header4"))
+        {
+            flags |= Breakdown.Child;
+        }
+
+        return flags;
+    }
+
+    private static string? NextHeaderColumn(string column) => column switch
+    {
+        "Header1" => "Header2",
+        "Header2" => "Header3",
+        "Header3" => "Header4",
+        "Header4" => "Header5",
+        "Header5" => "Header6",
+        "Header6" => "Header7",
+        _ => null
+    };
 
     private static bool AsksDateCompare(string folded) =>
         ContainsAny(
@@ -979,6 +1166,105 @@ public sealed class AlmSqlPlanner : IAlmSqlPlanner
         return string.Join(" · ", bits);
     }
 
+    private static List<FollowUpSuggestionDto> BuildFollowUps(
+        LineItem item,
+        string? approach,
+        string? ccy,
+        string? pool,
+        string? date,
+        DateScanMode dateScan,
+        Breakdown breakdown,
+        bool tenorDistribution,
+        string? metric)
+    {
+        if (metric is not null)
+        {
+            return [];
+        }
+
+        var list = new List<FollowUpSuggestionDto>();
+        var stem = FollowUpStem(item, approach, ccy, pool, date, dateScan);
+
+        if (ccy is null && !breakdown.HasFlag(Breakdown.Ccy))
+        {
+            list.Add(new FollowUpSuggestionDto
+            {
+                Label = "Döviz koduna göre",
+                Question = $"{stem}, döviz koduna göre toplam bakiye nedir?"
+            });
+        }
+
+        if (pool is null && !breakdown.HasFlag(Breakdown.Pool))
+        {
+            list.Add(new FollowUpSuggestionDto
+            {
+                Label = "Havuz tipine göre",
+                Question = $"{stem}, havuz tipine göre toplam bakiye nedir?"
+            });
+        }
+
+        if (!breakdown.HasFlag(Breakdown.TpYp))
+        {
+            list.Add(new FollowUpSuggestionDto
+            {
+                Label = "TP / YP ayrımı",
+                Question = $"{stem}, TP YP ayrımına göre toplam bakiye nedir?"
+            });
+        }
+
+        if (!tenorDistribution
+            && NextHeaderColumn(item.HeaderColumn) is not null
+            && !breakdown.HasFlag(Breakdown.Child))
+        {
+            list.Add(new FollowUpSuggestionDto
+            {
+                Label = "Alt kalemlere göre",
+                Question = $"{stem}, alt kalemlere göre toplam bakiye nedir?"
+            });
+        }
+
+        if (!breakdown.HasFlag(Breakdown.Child)
+            && ChildrenByHeader.TryGetValue(item.HeaderValue, out var children))
+        {
+            foreach (var child in children)
+            {
+                list.Add(new FollowUpSuggestionDto
+                {
+                    Label = child,
+                    Question = $"{ApproachPhrase(approach)}{child}, {DatePhrase(date, dateScan)} toplam bakiyesi nedir?"
+                });
+            }
+        }
+
+        return list;
+    }
+
+    private static string FollowUpStem(
+        LineItem item,
+        string? approach,
+        string? ccy,
+        string? pool,
+        string? date,
+        DateScanMode dateScan)
+    {
+        var parts = new List<string>();
+        if (approach == "Liquidity") parts.Add("likidite");
+        if (approach == "Rate") parts.Add("kar payı yaklaşımı");
+        if (ccy is not null) parts.Add(ccy);
+        if (pool == "KATILMA") parts.Add("katılma havuzu");
+        if (pool == "OZKAYNAK") parts.Add("özkaynak havuzu");
+        parts.Add(item.HeaderValue);
+        parts.Add(DatePhrase(date, dateScan));
+        return string.Join(", ", parts);
+    }
+
+    private static string ApproachPhrase(string? approach) => approach switch
+    {
+        "Liquidity" => "likidite, ",
+        "Rate" => "kar payı yaklaşımı, ",
+        _ => string.Empty
+    };
+
     private static string DatePhrase(string? date, DateScanMode dateScan)
     {
         if (date is not null)
@@ -1057,7 +1343,7 @@ public sealed class AlmSqlPlanner : IAlmSqlPlanner
 
     private static string Escape(string value) => value.Replace("'", "''");
 
-    private sealed record LineItem(string Phrase, string HeaderColumn, string HeaderValue);
+    private sealed record LineItem(string Phrase, string HeaderColumn, string HeaderValue, string? CoaContains = null);
 
     private sealed record FuzzyLineItem(LineItem Item, string MatchedText, int Distance, double Score);
 }

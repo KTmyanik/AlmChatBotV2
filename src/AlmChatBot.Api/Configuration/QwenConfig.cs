@@ -8,5 +8,5 @@ public sealed class QwenConfig
 
     public string ApiKey { get; set; } = "ollama";
 
-    public string ModelName { get; set; } = "qwen3.5:4b";
+    public string ModelName { get; set; } = "gemma:latest";
 }
